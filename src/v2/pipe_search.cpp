@@ -174,7 +174,7 @@ namespace diskann {
 #endif
     std::vector<unsigned> mem_tags(mem_L);
     std::vector<float> mem_dists(mem_L);
-
+    // TODO: 这里的overlap_INIT优化，指的是把入口点的PQ计算也Overlap？
 #ifdef OVERLAP_INIT
     if (mem_L) {
       mem_index_->search_with_tags_fast(query, mem_L, mem_tags.data(), mem_dists.data());
@@ -195,7 +195,7 @@ namespace diskann {
     std::sort(retset.begin(), retset.begin() + cur_list_size);
 #endif
 
-    std::queue<io_t> on_flight_ios;
+    std::queue<io_t> on_flight_ios; // 存储正在执行的I/O请求
     auto send_read_req = [&](Neighbor &item) -> bool {
       item.flag = false;
 
@@ -220,10 +220,13 @@ namespace diskann {
     auto poll_all = [&]() -> std::pair<int, int> {
       // poll once.
       reader->poll_all(ctx);
-      unsigned n_in = 0, n_out = 0;
+      unsigned n_in = 0, n_out = 0; // 符合距离阈值的个数, 不符合距离阈值的个数
       while (!on_flight_ios.empty() && on_flight_ios.front().finished()) {
         io_t &io = on_flight_ios.front();
+        // TODO: check here
+        // 将邻居id和对应的节点数据缓存地址插入id_buf_map
         id_buf_map.insert(std::make_pair(io.nbr.id, offset_to_loc((char *) io.read_req->buf, io.loc)));
+        // 如果邻居距离小于当前候选池中最大距离, 则n_in加1, 否则n_out加1
         io.nbr.distance <= retset[cur_list_size - 1].distance ? ++n_in : ++n_out;
         on_flight_ios.pop();
       }
@@ -260,12 +263,12 @@ namespace diskann {
           retset[marker].visited = true;
           auto it = id_buf_map.find(retset[marker].id);
           auto [id, buf] = *it;
-          compute_exact_dists_and_push(buf, id);
-          compute_and_push_nbrs(buf, nk);
+          compute_exact_dists_and_push(buf, id); // 计算精确距离
+          compute_and_push_nbrs(buf, nk); // 计算邻居距离
           break;
         }
       }
-
+      // TODO: flag代表的啥？
       /* guess the first unvisited vector (eager) */
       for (unsigned i = 0; i < cur_list_size; ++i) {
         if (!retset[i].visited && retset[i].flag /* not on-fly */
@@ -323,10 +326,10 @@ namespace diskann {
     int cur_n_in = 0, cur_tot = 0;
 #endif
 
-    while (get_first_unvisited() != -1) {
+    while (get_first_unvisited() != -1) { // 遍历候选池, 得到第一个未探索的点
       // poll to heap (best-effort) -> calc best from heap (skip if heap is empty) -> send IO (if can send) -> ...
       // auto io1_st = std::chrono::high_resolution_clock::now();
-      auto [n_in, n_out] = poll_all();
+      auto [n_in, n_out] = poll_all(); // pool请求
       std::ignore = n_in;
       std::ignore = n_out;
 
@@ -335,7 +338,7 @@ namespace diskann {
       constexpr int kBeamWidths[] = {4, 4, 8, 8, 16, 16, 24, 24, 32};
       cur_beam_width = kBeamWidths[std::min(max_marker / 5, 8u)];
 #else
-      if (max_marker >= 5 && n_in + n_out > 0) {
+      if (max_marker >= 5 && n_in + n_out > 0) { // 后面这个n_in + n_out > 0 是表示至少pool到了一个请求?
         cur_n_in += n_in;
         cur_tot += n_in + n_out;
         // converged, tune beam width.
@@ -348,7 +351,8 @@ namespace diskann {
       }
 #endif
 #endif
-
+      // 如果当前正在执行的I/O请求数小于当前beam宽度, 则发送请求
+      // TODO: 1.这里一个是发送一次，一个是发送剩余，不能理解.
       if ((int64_t) on_flight_ios.size() < cur_beam_width) {
 #ifdef NAIVE_PIPE
         send_best_read_req(cur_beam_width - on_flight_ios.size());
@@ -358,7 +362,7 @@ namespace diskann {
       }
       // auto io1_ed = std::chrono::high_resolution_clock::now();
       // stats->io_us1 += std::chrono::duration_cast<std::chrono::microseconds>(io1_ed - io1_st).count();
-      marker = calc_best_node();
+      marker = calc_best_node(); // 候选池中，第一个待I/O的点的位置
       max_marker = std::max(max_marker, marker);
     }
     auto cpu2_ed = std::chrono::high_resolution_clock::now();

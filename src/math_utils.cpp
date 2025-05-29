@@ -161,7 +161,7 @@ namespace math_utils {
 
 #pragma omp parallel for schedule(static, 1)
       for (int64_t j = cur_blk * PAR_BLOCK_SIZE;
-           j < std::min((_s64) num_points, (_s64) ((cur_blk + 1) * PAR_BLOCK_SIZE)); j++) {
+           j < std::min((_s64) num_points, (_s64)((cur_blk + 1) * PAR_BLOCK_SIZE)); j++) {
         for (size_t l = 0; l < k; l++) {
           size_t this_center_id = closest_centers[(j - cur_blk * PAR_BLOCK_SIZE) * k + l];
           closest_centers_ivf[j * k + l] = (uint32_t) this_center_id;

@@ -181,14 +181,14 @@ void LinuxAlignedFileReader::send_io(std::vector<IORequest> &reqs, void *ctx, bo
   io_uring_submit(ring);
 }
 
-int LinuxAlignedFileReader::poll(void *ctx) {
+int LinuxAlignedFileReader::poll(void *ctx) { // ctx是一个指向io_uring结构的指针
   io_uring *ring = (io_uring *) ctx;
   io_uring_cqe *cqe = nullptr;
-  int ret = io_uring_peek_cqe(ring, &cqe);
-  if (ret < 0) {
+  int ret = io_uring_peek_cqe(ring, &cqe); 
+  if (ret < 0) { // 没有完成的事件
     return ret;  // not finished yet.
   }
-  if (cqe->res < 0) {
+  if (cqe->res < 0) { // 如果事件失败
     LOG(ERROR) << "Failed " << strerror(-cqe->res);
   }
   IORequest *req = (IORequest *) cqe->user_data;
@@ -200,21 +200,21 @@ int LinuxAlignedFileReader::poll(void *ctx) {
 }
 
 void LinuxAlignedFileReader::poll_all(void *ctx) {
-  io_uring *ring = (io_uring *) ctx;
-  static __thread io_uring_cqe *cqes[MAX_EVENTS];
-  int ret = io_uring_peek_batch_cqe(ring, cqes, MAX_EVENTS);
-  if (ret < 0) {
+  io_uring *ring = (io_uring *) ctx; // ctx是一个指向io_uring结构的指针
+  static __thread io_uring_cqe *cqes[MAX_EVENTS]; // 线程私有
+  int ret = io_uring_peek_batch_cqe(ring, cqes, MAX_EVENTS); // 调用io_uring API函数获取一批已完成的I/O事件, 非阻塞
+  if (ret < 0) { // 没有完成的事件
     return;  // not finished yet.
   }
-  for (int i = 0; i < ret; i++) {
-    if (cqes[i]->res < 0) {
+  for (int i = 0; i < ret; i++) { // 遍历每个事件
+    if (cqes[i]->res < 0) { // 事件错误
       LOG(ERROR) << "Failed " << strerror(-cqes[i]->res);
     }
-    IORequest *req = (IORequest *) cqes[i]->user_data;
-    if (req != nullptr) {
+    IORequest *req = (IORequest *) cqes[i]->user_data; // 获取事件对应的请求
+    if (req != nullptr) { // 标志为已完成
       req->finished = true;
     }
-    io_uring_cqe_seen(ring, cqes[i]);
+    io_uring_cqe_seen(ring, cqes[i]); // 标记事件已处理
   }
 }
 

@@ -384,7 +384,7 @@ namespace diskann {
 
     num_medoids = 1;
     medoids = new uint32_t[1];
-    medoids[0] = (_u32) (medoid_id_on_file);
+    medoids[0] = (_u32)(medoid_id_on_file);
     use_medoids_data_as_centroids();
     diskann::cout << "PQFlashIndex loaded successfully." << std::endl;
     return 0;

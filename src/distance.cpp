@@ -561,14 +561,14 @@ namespace diskann {
 #else
 #pragma omp simd reduction(+ : result) aligned(a, b : 8)
     for (_s32 i = 0; i < (_s32) size; i++) {
-      result += ((int32_t) ((int16_t) a[i] - (int16_t) b[i])) * ((int32_t) ((int16_t) a[i] - (int16_t) b[i]));
+      result += ((int32_t)((int16_t) a[i] - (int16_t) b[i])) * ((int32_t)((int16_t) a[i] - (int16_t) b[i]));
     }
     return (float) result;
 #endif
 #else
 #pragma omp simd reduction(+ : result) aligned(a, b : 8)
     for (int32_t i = 0; i < (int32_t) size; i++) {
-      result += ((int32_t) ((int16_t) a[i] - (int16_t) b[i])) * ((int32_t) ((int16_t) a[i] - (int16_t) b[i]));
+      result += ((int32_t)((int16_t) a[i] - (int16_t) b[i])) * ((int32_t)((int16_t) a[i] - (int16_t) b[i]));
     }
     return (float) result;
 #endif
@@ -580,7 +580,7 @@ namespace diskann {
 #pragma omp simd reduction(+ : result) aligned(a, b : 8)
 #endif
     for (int32_t i = 0; i < (int32_t) size; i++) {
-      result += ((int32_t) ((int16_t) a[i] - (int16_t) b[i])) * ((int32_t) ((int16_t) a[i] - (int16_t) b[i]));
+      result += ((int32_t)((int16_t) a[i] - (int16_t) b[i])) * ((int32_t)((int16_t) a[i] - (int16_t) b[i]));
     }
     return (float) result;
   }
@@ -596,7 +596,7 @@ namespace diskann {
     float result = 0;
 #ifdef USE_AVX2
     // assume size is divisible by 8
-    uint16_t niters = (uint16_t) (size / 8);
+    uint16_t niters = (uint16_t)(size / 8);
     __m256 sum = _mm256_setzero_ps();
     for (uint16_t j = 0; j < niters; j++) {
       // scope is a[8j:8j+7], b[8j:8j+7]

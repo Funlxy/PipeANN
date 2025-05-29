@@ -92,7 +92,7 @@ namespace diskann {
   }
 
   size_t calculate_num_pq_chunks(double final_index_ram_limit, size_t points_num, uint32_t dim) {
-    size_t num_pq_chunks = (size_t) (std::floor)(_u64(final_index_ram_limit / (double) points_num));
+    size_t num_pq_chunks = (size_t)(std::floor)(_u64(final_index_ram_limit / (double) points_num));
 
     diskann::cout << "Calculated num_pq_chunks :" << num_pq_chunks << std::endl;
     num_pq_chunks = num_pq_chunks <= 0 ? 1 : num_pq_chunks;
