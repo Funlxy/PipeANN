@@ -175,6 +175,7 @@ namespace diskann {
     std::vector<unsigned> mem_tags(mem_L);
     std::vector<float> mem_dists(mem_L);
     // TODO: 这里的overlap_INIT优化，指的是把入口点的PQ计算也Overlap？
+    // 这样是为了把PQ_table初始化也放到后面
 #ifdef OVERLAP_INIT
     if (mem_L) {
       mem_index_->search_with_tags_fast(query, mem_L, mem_tags.data(), mem_dists.data());
@@ -268,7 +269,7 @@ namespace diskann {
           break;
         }
       }
-      // TODO: flag代表的啥？
+      // TODO: flag代表的啥 -> on-flight I/O
       /* guess the first unvisited vector (eager) */
       for (unsigned i = 0; i < cur_list_size; ++i) {
         if (!retset[i].visited && retset[i].flag /* not on-fly */
@@ -310,13 +311,15 @@ namespace diskann {
 
     std::ignore = print_state;
 
+    // TODO: overlap主要是在这,看看如何具体理解
     auto cpu2_st = std::chrono::high_resolution_clock::now();
-    send_best_read_req(cur_beam_width - on_flight_ios.size());
+    send_best_read_req(cur_beam_width - on_flight_ios.size()); // 发送起始点I/O请求
     unsigned marker = 0, max_marker = 0;
 #ifdef OVERLAP_INIT
+    // TODO: 这里已经I/O了，然后又丢进retset, 会有问题吗?
     pq_table.populate_chunk_distances_nt(query, pq_dists);  // overlap with the first I/O.
     compute_pq_dists(mem_tags.data(), mem_L, dist_scratch);
-    for (unsigned i = 0; i < cur_list_size; ++i) {
+    for (unsigned i = 0; i < cur_list_size; ++i) { // 更新距离
       retset[i].distance = dist_scratch[i];
     }
     std::sort(retset.begin(), retset.begin() + cur_list_size);
@@ -326,6 +329,7 @@ namespace diskann {
     int cur_n_in = 0, cur_tot = 0;
 #endif
 
+    // TODO:需要解决的, 这里的判断与page_search里的k是否有区别？
     while (get_first_unvisited() != -1) { // 遍历候选池, 得到第一个未探索的点
       // poll to heap (best-effort) -> calc best from heap (skip if heap is empty) -> send IO (if can send) -> ...
       // auto io1_st = std::chrono::high_resolution_clock::now();
@@ -338,6 +342,7 @@ namespace diskann {
       constexpr int kBeamWidths[] = {4, 4, 8, 8, 16, 16, 24, 24, 32};
       cur_beam_width = kBeamWidths[std::min(max_marker / 5, 8u)];
 #else
+      // n_in有可能进入候选池，是有用的I/O，n_out是无效的I/O
       if (max_marker >= 5 && n_in + n_out > 0) { // 后面这个n_in + n_out > 0 是表示至少pool到了一个请求?
         cur_n_in += n_in;
         cur_tot += n_in + n_out;
@@ -346,13 +351,13 @@ namespace diskann {
         if ((cur_tot - cur_n_in) * 1.0 / cur_tot <= kWasteThreshold) {
           cur_beam_width = cur_beam_width + 1;
           cur_beam_width = std::max(cur_beam_width, 4l);
-          cur_beam_width = std::min((int64_t) beam_width, cur_beam_width);
+          cur_beam_width = std::min((int64_t) beam_width, cur_beam_width); // 小于设置的beam_width
         }
       }
 #endif
 #endif
       // 如果当前正在执行的I/O请求数小于当前beam宽度, 则发送请求
-      // TODO: 1.这里一个是发送一次，一个是发送剩余，不能理解.
+      // 避免浪费，一次发送一个
       if ((int64_t) on_flight_ios.size() < cur_beam_width) {
 #ifdef NAIVE_PIPE
         send_best_read_req(cur_beam_width - on_flight_ios.size());
